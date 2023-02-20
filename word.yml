@@ -1,0 +1,54 @@
+---
+
+  - name: "Deploy Wordpress"
+    hosts: localhost
+    connection: local 
+    tasks:
+
+    - name: Add stable chart repo
+      kubernetes.core.helm_repository:
+        name: nginx-stable
+        repo_url: "https://helm.nginx.com/stable"
+
+    - name: Deploy Ngnix Ingress
+      kubernetes.core.helm:
+        name: nginx-ingress
+        chart_ref: nginx-stable/nginx-ingress
+        release_namespace: default
+        values:
+          replicas: 2
+
+#  ------   Install Nginx controller manually from other repo  -----
+#     - name: Install repo with Nginx ingress
+#       kubernetes.core.helm_repository:
+#         name: nginx-stable
+#         repo_url: "https://kubernetes.github.io/ingress-nginx"
+#
+#     - name: Run ConfigMap
+#       ansible.builtin.command: helm install nginx-ingress ingress-nginx/ingress-nginx --create-namespace --namespace ingress --set controller.replicaCount=2
+
+
+    - name: Dowload and extract Wordpress helm chart
+      ansible.builtin.unarchive:
+        src: https://github.com/AndrukhivAndriy/DevOps-BaseCamp/raw/main/k8s/wordpresschart.zip
+        dest: /home/ubuntu
+        remote_src: yes
+
+    - name: Download ConfigMap to enable ModSecurity
+      ansible.builtin.get_url:
+         url: https://raw.githubusercontent.com/AndrukhivAndriy/DevOps-BaseCamp/main/k8s/confmodsec.yaml
+         dest: /home/ubuntu
+
+    - name: Run ConfigMap
+      ansible.builtin.command: kubectl apply -f /home/ubuntu/confmodsec.yaml
+     
+    - name: Deploy cert-manager
+      ansible.builtin.command: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+
+    - name: Deploy Wordpress chart
+      kubernetes.core.helm:
+        name: wordpress
+        chart_ref: /home/ubuntu/wordpresschart
+        release_namespace: default
+       
+
